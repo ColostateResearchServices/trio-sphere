@@ -99,6 +99,7 @@ async function initializeApp() {
   const filterOverlay = document.getElementById("filterOverlay");
   const viewToggleCard = document.getElementById("viewToggleCard");
   const viewToggleList = document.getElementById("viewToggleList");
+  const viewTogglePreview = document.getElementById("viewTogglePreview");
 
   // Info Modal elements
   const modal         = document.getElementById("infoModal");
@@ -183,6 +184,14 @@ async function initializeApp() {
     return true;
   }
 
+  // Helper function to generate PagePeeker thumbnail URL
+  function getPreviewUrl(url) {
+    // PagePeeker API - free service, no API key needed
+    // Size options: s (small), m (medium), l (large), x (extra large)
+    const encodedUrl = encodeURIComponent(url);
+    return `https://free.pagepeeker.com/v2/thumbs.php?size=l&url=${encodedUrl}`;
+  }
+
   function buildCard(ds) {
     const el = document.createElement("article");
     el.className = "card";
@@ -201,15 +210,40 @@ async function initializeApp() {
       }
     }
 
-    el.innerHTML = `
-      ${recentlyAddedBadge}
-      <h3>${ds.name}</h3>
-      <p>${ds.description}</p>
-      <div class="taglist">
-        ${ds.tags.map(t => `<span class="tag">${t}</span>`).join("")}
-      </div>
-      <button type="button" class="btn more-info">More Info</button>
-    `;
+    // Build different layouts based on current view
+    if (currentView === 'preview') {
+      const previewUrl = getPreviewUrl(ds.url);
+      el.innerHTML = `
+        ${recentlyAddedBadge}
+        <div class="card-preview-thumbnail">
+          <div class="preview-loading"><i class="fas fa-spinner fa-spin"></i></div>
+          <img src="${previewUrl}" alt="Preview of ${ds.name}"
+               onerror="this.style.display='none'; this.parentElement.querySelector('.preview-error').style.display='block';"
+               onload="this.parentElement.querySelector('.preview-loading').style.display='none';">
+          <div class="preview-error" style="display: none;">
+            <i class="fas fa-image" style="font-size: 2rem; opacity: 0.3; display: block; margin-bottom: 0.5rem;"></i>
+            Preview unavailable
+          </div>
+        </div>
+        <div class="card-content">
+          <h3>${ds.name}</h3>
+          <p>${ds.description}</p>
+          <button type="button" class="btn more-info">View Details</button>
+        </div>
+      `;
+    } else {
+      // Regular card or list view
+      el.innerHTML = `
+        ${recentlyAddedBadge}
+        <h3>${ds.name}</h3>
+        <p>${ds.description}</p>
+        <div class="taglist">
+          ${ds.tags.map(t => `<span class="tag">${t}</span>`).join("")}
+        </div>
+        <button type="button" class="btn more-info">More Info</button>
+      `;
+    }
+
     el.querySelector(".more-info")
       .addEventListener("click", () => showModal(ds));
     return el;
@@ -393,18 +427,33 @@ async function initializeApp() {
     currentView = viewType;
     localStorage.setItem('triosphere-view', viewType);
 
+    // Remove all view classes
+    grid.classList.remove('list-view', 'preview-view');
+
+    // Remove active state from all buttons
+    viewToggleCard.classList.remove('active');
+    viewToggleList.classList.remove('active');
+    viewTogglePreview.classList.remove('active');
+
+    viewToggleCard.setAttribute('aria-pressed', 'false');
+    viewToggleList.setAttribute('aria-pressed', 'false');
+    viewTogglePreview.setAttribute('aria-pressed', 'false');
+
+    // Apply the selected view
     if (viewType === 'list') {
       grid.classList.add('list-view');
       viewToggleList.classList.add('active');
-      viewToggleCard.classList.remove('active');
       viewToggleList.setAttribute('aria-pressed', 'true');
-      viewToggleCard.setAttribute('aria-pressed', 'false');
+    } else if (viewType === 'preview') {
+      grid.classList.add('preview-view');
+      viewTogglePreview.classList.add('active');
+      viewTogglePreview.setAttribute('aria-pressed', 'true');
+      // Re-render to build preview cards
+      render();
     } else {
-      grid.classList.remove('list-view');
+      // Card view (default)
       viewToggleCard.classList.add('active');
-      viewToggleList.classList.remove('active');
       viewToggleCard.setAttribute('aria-pressed', 'true');
-      viewToggleList.setAttribute('aria-pressed', 'false');
     }
   }
 
@@ -412,11 +461,24 @@ async function initializeApp() {
   setView(currentView);
 
   if (viewToggleCard) {
-    viewToggleCard.addEventListener('click', () => setView('card'));
+    viewToggleCard.addEventListener('click', () => {
+      setView('card');
+      render();  // Re-render for card view
+    });
   }
 
   if (viewToggleList) {
-    viewToggleList.addEventListener('click', () => setView('list'));
+    viewToggleList.addEventListener('click', () => {
+      setView('list');
+      render();  // Re-render for list view
+    });
+  }
+
+  if (viewTogglePreview) {
+    viewTogglePreview.addEventListener('click', () => {
+      setView('preview');
+      // render() is called inside setView for preview
+    });
   }
 
   // Initial draw
