@@ -1,0 +1,30 @@
+FROM alpine:3.19
+
+# Update OS
+RUN apk update && apk upgrade
+
+# Install thttpd
+RUN apk add thttpd
+
+# Make entrypoint for Docker
+RUN mkdir /startup
+COPY docker/*.sh /startup/
+RUN chmod 755 /startup/*.sh
+
+# Create a non-root user to own the files and run our server
+RUN adduser -D static
+WORKDIR /home/static
+
+# Copy the static website
+# Use the .dockerignore file to control what ends up inside the image!
+COPY images images
+COPY *.html .
+COPY *.xlsx .
+COPY *.md .
+COPY script.js .
+COPY style.css .
+RUN for thisFile in `find . -type f`; do chown static:static ${thisFile}; done
+
+USER static
+EXPOSE 3000
+CMD ["/startup/docker_entrypoint.sh"]
