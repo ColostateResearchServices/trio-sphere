@@ -646,7 +646,7 @@ main{
 .navbar .container{
     max-width:1200px; margin:0 auto;
     display:flex; align-items:center; justify-content:space-between;
-    padding:.85rem 1rem;
+    padding:.85rem 1.25rem;
 }
 .navbar .brand{
     font-weight:700; font-size:1.25rem;

@@ -17,10 +17,79 @@
 </head>
 <link rel="stylesheet" href="style.css">
 <style>
-  /* Nudge separator up on Data page to match Home/About pages */
-  #csu-header .csu-separator { transform: translateY(-3px); display: inline-block; }
-  /* Nudge VP text up slightly to match Home/About */
-  #csu-header .csu-text-section h2 { transform: translateY(-3px); display: inline-block; margin: 0; }
+  /* Override header styles to match Home/About pages */
+  #csu-header {
+    background-color: #1E4D2B !important;
+    border-bottom: none !important;
+    padding: 8px 20px !important;
+    width: 100% !important;
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: flex-start !important;
+    align-items: center !important;
+    text-align: left !important;
+    max-width: none !important;
+    margin: 0 !important;
+    position: relative !important;
+    z-index: 50 !important;
+  }
+
+  #csu-header .csu-header-container {
+    max-width: 1200px;
+    margin: 0;
+    padding: 0;
+    display: flex !important;
+    justify-content: flex-start !important;
+    align-items: center !important;
+    gap: 1rem !important;
+  }
+
+  .csu-logo-section {
+    flex-shrink: 0;
+    display: flex !important;
+  }
+
+  .csu-logo-link {
+    display: inline-block !important;
+    text-decoration: none !important;
+  }
+
+  .csu-signature-logo {
+    height: 56px !important;
+    width: auto !important;
+    display: block !important;
+  }
+
+  .csu-separator {
+    color: white !important;
+    font-size: 1.5em;
+    line-height: 56px !important;
+    flex-shrink: 0;
+    display: inline-block;
+  }
+
+  .csu-text-section {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0.25rem !important;
+  }
+
+  .csu-text-section h2 {
+    margin: 0 !important;
+    font-size: 1em !important;
+    font-weight: normal !important;
+    color: white !important;
+    display: inline-block;
+  }
+
+  .csu-text-section a {
+    color: white !important;
+    text-decoration: none !important;
+  }
+
+  .csu-text-section a:hover {
+    text-decoration: underline !important;
+  }
 </style>
 
 <body>
@@ -97,9 +166,10 @@
         <button id="viewToggleList" class="view-toggle-btn" title="List view" aria-pressed="false">
           <i class="fas fa-list"></i>
         </button>
-        <button id="viewTogglePreview" class="view-toggle-btn" title="Preview view" aria-pressed="false">
+        <!-- Preview view button disabled pending PageSeeker coordination -->
+        <!-- <button id="viewTogglePreview" class="view-toggle-btn" title="Preview view" aria-pressed="false">
           <i class="fas fa-image"></i>
-        </button>
+        </button> -->
       </div>
       <button id="exportCsvBtn" class="export-btn" title="Export filtered results to CSV">
         <i class="fas fa-download"></i> Export to CSV
