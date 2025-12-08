@@ -16,28 +16,27 @@
 
 </head>
 <link rel="stylesheet" href="style.css">
+<style>
+  /* Nudge separator up on Data page to match Home/About pages */
+  #csu-header .csu-separator { transform: translateY(-3px); display: inline-block; }
+  /* Nudge VP text up slightly to match Home/About */
+  #csu-header .csu-text-section h2 { transform: translateY(-3px); display: inline-block; margin: 0; }
+</style>
 
 <body>
   <!-- CSU Header Banner -->
   <header id="csu-header" class="site-header" role="banner">
-    <section id="BrandLogo">
-      <h1>
-        <a href="http://colostate.edu">Colorado State University</a>
-      </h1>
-      <h2>
-        <a href="https://www.research.colostate.edu/">Vice President for Research</a>
-      </h2>
-      <script src="//static.colostate.edu/logo/reslogo/logo.min.js" async defer></script>
-      <script>
-      var logosettings = {
-        screenSM: 400,
-        screenMD: 600,
-        screenLG: 800,
-        baseSize: 380,
-        fontSize: 'small'
-      };
-      </script>
-    </section>
+    <div class="csu-header-container">
+      <div class="csu-logo-section">
+        <a href="https://www.colostate.edu" class="csu-logo-link">
+          <img src="https://onehealth.colostate.edu/wp-content/uploads/sites/4/2019/03/signature-oneline.svg" alt="Colorado State University" class="csu-signature-logo">
+        </a>
+      </div>
+      <div class="csu-separator">|</div>
+      <div class="csu-text-section">
+        <h2><a href="https://www.research.colostate.edu/">Vice President for Research</a></h2>
+      </div>
+    </div>
   </header>
 
   <!-- TrioSphere Navigation -->
@@ -53,7 +52,7 @@
 
         <div class="nav-buttons">
           <a href="https://onehealth.colostate.edu/" target="_blank" rel="noopener noreferrer" class="cta-btn-small">CSU One Health</a>
-          <a href="https://dsri.colostate.edu/" target="_blank" rel="noopener noreferrer" class="cta-btn-small">CSU DSRI</a>
+          <a href="https://www.research.colostate.edu/dsri/" target="_blank" rel="noopener noreferrer" class="cta-btn-small">CSU DSRI</a>
         </div>
     </div>
     </nav>
@@ -187,20 +186,23 @@
   <footer id="csu-footer" class="site-footer">
     <!-- Social Media Section -->
     <div class="footer-social">
-      <a href="https://www.facebook.com/onehealth.csu" target="_blank" rel="noopener">
-        <img src="https://www.research.colostate.edu/wp-content/uploads/2018/07/facebook-1.png" alt="Facebook">
+      <a href="https://bsky.app/profile/onehealthcsu.bsky.social" target="_blank" rel="noopener noreferrer" title="Bluesky">
+        <img src="https://cdn.simpleicons.org/bluesky/ffffff" alt="Bluesky" />
       </a>
-      <a href="https://twitter.com/onehealth_csu" target="_blank" rel="noopener">
-        <img src="https://www.research.colostate.edu/wp-content/uploads/2018/07/twitter-1.png" alt="Twitter">
+      <a href="https://linkedin.com/company/onehealthinstitutecsu/" target="_blank" rel="noopener noreferrer" title="LinkedIn">
+        <img src="https://onehealth.colostate.edu/wp-content/uploads/sites/4/2019/03/white-linkedin.png" alt="LinkedIn" />
       </a>
-      <a href="https://www.linkedin.com/company/onehealthinstitutecsu" target="_blank" rel="noopener">
-        <img src="https://onehealth.colostate.edu/wp-content/uploads/sites/4/2019/03/white-linkedin.png" alt="LinkedIn">
+      <a href="https://www.facebook.com/onehealth.csu/" target="_blank" rel="noopener noreferrer" title="Facebook">
+        <img src="https://cdn.simpleicons.org/facebook/ffffff" alt="Facebook" />
+      </a>
+      <a href="https://www.instagram.com/onehealthcsu/" target="_blank" rel="noopener noreferrer" title="Instagram">
+        <img src="https://cdn.simpleicons.org/instagram/ffffff" alt="Instagram" />
       </a>
     </div>
 
     <!-- OVPR Office Information -->
     <div class="footer-info">
-      <a href="https://www.research.colostate.edu/office-information/">OVPR Office Information</a>
+      <a href="https://www.research.colostate.edu/about-us/">OVPR Office Information</a>
     </div>
 
     <!-- Bottom Footer -->
