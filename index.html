@@ -5,7 +5,7 @@
   <title>TrioSphere</title>
 
   <link rel="preconnect" href="https://fonts.gstatic.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
 
   <!-- SheetJS for Excel reading -->
@@ -16,24 +16,131 @@
 
 </head>
 <link rel="stylesheet" href="style.css">
+<style>
+  /* Override header styles to match Home/About pages */
+  #csu-header {
+    background-color: #1E4D2B !important;
+    border-bottom: none !important;
+    padding: 8px 20px !important;
+    width: 100% !important;
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: flex-start !important;
+    align-items: center !important;
+    text-align: left !important;
+    max-width: none !important;
+    margin: 0 !important;
+    position: relative !important;
+    z-index: 50 !important;
+  }
+
+  #csu-header .csu-header-container {
+    max-width: 1200px;
+    margin: 0;
+    padding: 0;
+    display: flex !important;
+    justify-content: flex-start !important;
+    align-items: center !important;
+    gap: 1rem !important;
+  }
+
+  .csu-logo-section {
+    flex-shrink: 0;
+    display: flex !important;
+  }
+
+  .csu-logo-link {
+    display: inline-block !important;
+    text-decoration: none !important;
+  }
+
+  .csu-signature-logo {
+    height: 56px !important;
+    width: auto !important;
+    display: block !important;
+  }
+
+  .csu-separator {
+    color: white !important;
+    font-size: 1.5em;
+    line-height: 56px !important;
+    flex-shrink: 0;
+    display: inline-block;
+  }
+
+  .csu-text-section {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0.25rem !important;
+  }
+
+  .csu-text-section h2 {
+    margin: 0 !important;
+    font-size: 1em !important;
+    font-weight: normal !important;
+    color: white !important;
+    display: inline-block;
+  }
+
+  .csu-text-section a {
+    color: white !important;
+    text-decoration: none !important;
+  }
+
+  .csu-text-section a:hover {
+    text-decoration: underline !important;
+  }
+</style>
 
 <body>
+  <!-- CSU Header Banner -->
+  <header id="csu-header" class="site-header" role="banner">
+    <div class="csu-header-container">
+      <div class="csu-logo-section">
+        <a href="https://www.colostate.edu" class="csu-logo-link">
+          <img src="https://onehealth.colostate.edu/wp-content/uploads/sites/4/2019/03/signature-oneline.svg" alt="Colorado State University" class="csu-signature-logo">
+        </a>
+      </div>
+      <div class="csu-separator">|</div>
+      <div class="csu-text-section">
+        <h2><a href="https://www.research.colostate.edu/">VICE PRESIDENT FOR RESEARCH</a></h2>
+      </div>
+    </div>
+  </header>
+
+  <!-- TrioSphere Navigation -->
   <nav class="navbar">
     <div class="container">
+      <div class="navbar-left">
+        <a href="https://onehealth.colostate.edu/" target="_blank" rel="noopener noreferrer" class="navbar-partner-link" title="CSU One Health Institute">
+          <img src="images/OHI-Rings.webp" alt="CSU One Health Institute" class="partner-logo">
+          <span class="partner-text ohi-text partner-text-full">One Health Institute</span>
+          <span class="partner-text ohi-text partner-text-abbrev">OHI</span>
+        </a>
+      </div>
+      <div class="navbar-center">
         <a class="brand" href="home.html">TrioSphere</a>
-
-        <div class="menu">
-        <a href="home.html">Home</a>
-        <a href="index.html">Data</a>
-        <a href="about.html">About</a>
-        </div>
-
-        <div class="nav-buttons">
-          <a href="https://onehealth.colostate.edu/" target="_blank" rel="noopener noreferrer" class="cta-btn-small">CSU One Health</a>
-          <a href="https://dsri.colostate.edu/" target="_blank" rel="noopener noreferrer" class="cta-btn-small">CSU DSRI</a>
-        </div>
+      </div>
+      <div class="navbar-right">
+        <a href="https://www.research.colostate.edu/dsri/" target="_blank" rel="noopener noreferrer" class="navbar-partner-link" title="CSU Data Science Research Institute">
+          <img src="images/dsri_logo.png" alt="DSRI Logo" class="partner-logo">
+          <span class="partner-text dsri-text partner-text-full">Data Science Research Institute</span>
+          <span class="partner-text dsri-text partner-text-abbrev">DSRI</span>
+        </a>
+      </div>
     </div>
-    </nav>
+  </nav>
+
+  <!-- Sub-navigation -->
+  <nav class="subnav">
+    <div class="container">
+      <ul class="subnav-menu">
+        <li><a href="home.html">Home</a></li>
+        <li><a href="index.html" class="active">Data</a></li>
+        <li><a href="about.html">About</a></li>
+      </ul>
+    </div>
+  </nav>
   <header>
     <div class="header-intro">
     <h1>TrioSphere</h1>
@@ -75,9 +182,10 @@
         <button id="viewToggleList" class="view-toggle-btn" title="List view" aria-pressed="false">
           <i class="fas fa-list"></i>
         </button>
-        <button id="viewTogglePreview" class="view-toggle-btn" title="Preview view" aria-pressed="false">
+        <!-- Preview view button disabled pending PageSeeker coordination -->
+        <!-- <button id="viewTogglePreview" class="view-toggle-btn" title="Preview view" aria-pressed="false">
           <i class="fas fa-image"></i>
-        </button>
+        </button> -->
       </div>
       <button id="exportCsvBtn" class="export-btn" title="Export filtered results to CSV">
         <i class="fas fa-download"></i> Export to CSV
@@ -159,6 +267,45 @@
 
   <!-- Note: data.js is no longer needed - we load directly from Excel -->
   <!-- <script src="data.js" defer></script> -->
+
+  <!-- CSU Footer -->
+  <footer id="csu-footer" class="site-footer">
+    <!-- Social Media Section -->
+    <div class="footer-social">
+      <a href="https://bsky.app/profile/onehealthcsu.bsky.social" target="_blank" rel="noopener noreferrer" title="Bluesky">
+        <img src="https://cdn.simpleicons.org/bluesky/ffffff" alt="Bluesky" />
+      </a>
+      <a href="https://linkedin.com/company/onehealthinstitutecsu/" target="_blank" rel="noopener noreferrer" title="LinkedIn">
+        <img src="https://onehealth.colostate.edu/wp-content/uploads/sites/4/2019/03/white-linkedin.png" alt="LinkedIn" />
+      </a>
+      <a href="https://www.facebook.com/onehealth.csu/" target="_blank" rel="noopener noreferrer" title="Facebook">
+        <img src="https://cdn.simpleicons.org/facebook/ffffff" alt="Facebook" />
+      </a>
+      <a href="https://www.instagram.com/onehealthcsu/" target="_blank" rel="noopener noreferrer" title="Instagram">
+        <img src="https://cdn.simpleicons.org/instagram/ffffff" alt="Instagram" />
+      </a>
+    </div>
+
+    <!-- OVPR Office Information -->
+    <div class="footer-info">
+      <a href="https://www.research.colostate.edu/about-us/">OVPR Office Information</a>
+    </div>
+
+    <!-- Bottom Footer -->
+    <div class="footer-bottom">
+      <div class="footer-links-csu">
+        <a href="http://admissions.colostate.edu/">Apply to CSU</a> |
+        <a href="https://www.colostate.edu/contact/">Contact CSU</a> |
+        <a href="http://www.colostate.edu/disclaimer/">Disclaimer</a> |
+        <a href="http://www.colostate.edu/equal-opportunity/">Equal Opportunity</a> |
+        <a href="http://www.colostate.edu/privacy/">Privacy Statement</a>
+      </div>
+      <p class="footer-copyright">© 2025 Colorado State University</p>
+      <div class="footer-logo">
+        <img src="signature-oneline.svg" alt="CSU logo" loading="lazy">
+      </div>
+    </div>
+  </footer>
 
 <script src="script.js" defer></script>
   </body>
