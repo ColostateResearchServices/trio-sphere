@@ -115,6 +115,24 @@
       background: #b0ad5f;
     }
 
+    /* DSRI button with logo */
+    .dsri-btn {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .dsri-logo {
+      height: 24px;
+      width: 24px;
+      object-fit: contain;
+    }
+
+    .dsri-text {
+      font-family: 'Poppins', sans-serif;
+      font-weight: 700; /* Bold */
+    }
+
     /* hero (smaller vibe) */
     .hero {
       padding: 6rem 1.25rem 5rem;
@@ -390,7 +408,10 @@
       </div>
       <div class="nav-buttons">
         <a href="https://onehealth.colostate.edu/" target="_blank" rel="noopener noreferrer" class="cta-btn-small">CSU One Health</a>
-        <a href="https://dsri.colostate.edu/" target="_blank" rel="noopener noreferrer" class="cta-btn-small">CSU DSRI</a>
+        <a href="https://dsri.colostate.edu/" target="_blank" rel="noopener noreferrer" class="cta-btn-small dsri-btn">
+          <img src="images/dsri_logo.png" alt="DSRI Logo" class="dsri-logo">
+          <span class="dsri-text">Data Science Research Institute</span>
+        </a>
       </div>
     </nav>
   </header>
