@@ -20,7 +20,7 @@ WORKDIR /home/static
 COPY images images
 COPY *.html .
 COPY *.xlsx .
-COPY *.md .
+COPY *.svg .
 COPY script.js .
 COPY style.css .
 RUN for thisFile in `find . -type f`; do chown static:static ${thisFile}; done
