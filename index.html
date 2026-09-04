@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>TrioSphere</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TrioSphere | Data</title>
 
   <link rel="preconnect" href="https://fonts.gstatic.com">
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -14,8 +15,12 @@
   <!-- Marked.js for Markdown parsing -->
   <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
 
-</head>
-<link rel="stylesheet" href="style.css">
+  <!-- DOMPurify to sanitize rendered Markdown -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.7/purify.min.js"></script>
+
+<!-- ?v= is a cache stamp: bump it on every deploy (see CLAUDE.md) so returning
+     visitors get the new CSS/JS instead of a months-old copy from their cache -->
+<link rel="stylesheet" href="style.css?v=2026-09-03">
 <style>
   /* Override header styles to match Home/About pages */
   #csu-header {
@@ -91,6 +96,7 @@
     text-decoration: underline !important;
   }
 </style>
+</head>
 
 <body>
   <!-- CSU Header Banner -->
@@ -176,16 +182,18 @@
     </span>
     <div class="results-actions">
       <div class="view-toggle" role="group" aria-label="View mode">
-        <button id="viewToggleCard" class="view-toggle-btn active" title="Card view" aria-pressed="true">
-          <i class="fas fa-th"></i>
+        <button id="viewToggleCard" class="view-toggle-btn active" title="Card view" aria-label="Card view" aria-pressed="true">
+          <i class="fas fa-th" aria-hidden="true"></i>
         </button>
-        <button id="viewToggleList" class="view-toggle-btn" title="List view" aria-pressed="false">
-          <i class="fas fa-list"></i>
+        <button id="viewToggleList" class="view-toggle-btn" title="List view" aria-label="List view" aria-pressed="false">
+          <i class="fas fa-list" aria-hidden="true"></i>
         </button>
-        <!-- Preview view button disabled pending PageSeeker coordination -->
-        <!-- <button id="viewTogglePreview" class="view-toggle-btn" title="Preview view" aria-pressed="false">
-          <i class="fas fa-image"></i>
-        </button> -->
+        <button id="viewTogglePreview" class="view-toggle-btn" title="Preview view (website screenshots)" aria-label="Preview view" aria-pressed="false">
+          <i class="fas fa-image" aria-hidden="true"></i>
+        </button>
+        <button id="viewToggleConstellation" class="view-toggle-btn" title="Constellation view (how sources relate)" aria-label="Constellation view" aria-pressed="false">
+          <i class="fas fa-circle-nodes" aria-hidden="true"></i>
+        </button>
       </div>
       <button id="exportCsvBtn" class="export-btn" title="Export filtered results to CSV">
         <i class="fas fa-download"></i> Export to CSV
@@ -221,7 +229,15 @@
         </div>
       </div>
       <div class="filter-group">
-        <strong>Year Range</strong>
+        <strong>Year Range
+          <button type="button" id="yearRangeInfoBtn" class="info-btn" aria-expanded="false" aria-controls="yearRangeInfoNote" aria-label="About the Year Range filter">
+            <i class="fas fa-circle-info" aria-hidden="true"></i>
+          </button>
+        </strong>
+        <p id="yearRangeInfoNote" class="filter-note hidden">
+          Filters by each source's overall coverage years. A source appears if its
+          coverage overlaps your range. Sources without listed years always remain visible.
+        </p>
         <label for="dateStart">Start</label>
         <input type="number" id="dateStart" placeholder="e.g. 2000" min="1000" max="2100">
         <label for="dateEnd">End</label>
@@ -235,12 +251,45 @@
       </div>
     </aside>
     <section id="datasetGrid" aria-live="polite"></section>
+
+    <!-- Constellation view: the same filtered subset, drawn as a star chart.
+         Hidden unless the fourth view toggle is on. -->
+    <section id="skyRegion" aria-label="Constellation view" hidden>
+      <div id="skyStage" class="sky-stage">
+        <canvas id="skyCanvas" tabindex="0" role="img"
+                aria-describedby="skyLegend"
+                aria-label="Star chart of the data catalog. Every source is a star, grouped by One Health category and joined to the sources it shares tags with. A text list of the same sources follows below."></canvas>
+        <div id="skyLegend" class="sky-legend"></div>
+        <div class="sky-controls">
+          <label class="sky-ctl-label" for="skyMode">Group by</label>
+          <select id="skyMode" class="sky-select">
+            <option value="categories">One Health rings</option>
+            <option value="tags">Rarest tag</option>
+            <option value="region">Region</option>
+            <option value="free">Nothing &mdash; link structure</option>
+          </select>
+          <button type="button" id="skyFit" class="sky-btn" title="Frame everything (keyboard: 0)">Reset view</button>
+        </div>
+        <div id="skyCard" class="sky-card" aria-hidden="true"></div>
+      </div>
+      <p class="sky-hint">
+        <i class="fas fa-circle-info" aria-hidden="true"></i>
+        Hover a star for a preview, click it for full details. Drag to pan, scroll to zoom.
+        With the chart focused, arrow keys step from star to star and Enter opens one.
+      </p>
+      <details class="sky-list">
+        <summary>Text list of the sources shown</summary>
+        <div id="skyList"></div>
+      </details>
+      <p id="skyCaption" class="visually-hidden" role="status" aria-live="polite"></p>
+    </section>
   </main>
   <div class="filter-overlay" id="filterOverlay"></div>
-  <div id="infoModal" class="modal hidden">
+  <div id="infoModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <div class="modal-content">
-      <button id="modalClose" class="modal-close">&times;</button>
+      <button id="modalClose" class="modal-close" aria-label="Close">&times;</button>
       <h2 id="modalTitle"></h2>
+      <img id="modalPreview" class="modal-preview" alt="" hidden>
       <div id="modalBody"></div>
       <footer class="modal-footer">
         <button id="modalDownload" class="download">Download From Site</button>
@@ -248,9 +297,9 @@
     </div>
   </div>
 
-  <div id="suggestionModal" class="modal hidden">
+  <div id="suggestionModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="suggestionModalTitle">
     <div class="modal-content">
-      <button id="suggestionModalClose" class="modal-close">&times;</button>
+      <button id="suggestionModalClose" class="modal-close" aria-label="Close">&times;</button>
       <h2 id="suggestionModalTitle">Suggest a Dataset or Leave Feedback</h2>
       <p style="margin: 0.5rem 0 1rem; line-height: 1.5;">
         Found a dataset we're missing? Have a link, a name, or just a general idea? Or do you have feedback on the site? Let us know below!
@@ -258,6 +307,9 @@
       <form id="suggestionForm">
         <label for="suggestionText" class="visually-hidden">Feedback or suggestion</label>
         <textarea id="suggestionText" placeholder="Paste a link, describe a dataset, or leave your feedback here..." rows="8" required></textarea>
+        <p style="margin: 0.5rem 0 0; font-size: 0.85rem; color: #555;">
+          Submitting opens your email app with your message pre-filled, addressed to the TrioSphere team.
+        </p>
         <footer class="modal-footer">
           <button type="submit" class="btn">Submit Feedback</button>
         </footer>
@@ -288,7 +340,7 @@
 
     <!-- OVPR Office Information -->
     <div class="footer-info">
-      <a href="https://www.research.colostate.edu/about-us/">OVPR Office Information</a>
+      <a href="https://www.research.colostate.edu/about-vpr/">OVPR Office Information</a>
     </div>
 
     <!-- Bottom Footer -->
@@ -300,13 +352,14 @@
         <a href="http://www.colostate.edu/equal-opportunity/">Equal Opportunity</a> |
         <a href="http://www.colostate.edu/privacy/">Privacy Statement</a>
       </div>
-      <p class="footer-copyright">© 2025 Colorado State University</p>
+      <p class="footer-copyright">© 2026 Colorado State University</p>
       <div class="footer-logo">
         <img src="signature-oneline.svg" alt="CSU logo" loading="lazy">
       </div>
     </div>
   </footer>
 
-<script src="script.js" defer></script>
+<script src="constellation.js?v=2026-09-03" defer></script>
+<script src="script.js?v=2026-09-03" defer></script>
   </body>
 </html>

@@ -4,10 +4,53 @@
 
 let DATASETS = [];
 
+// Preview view: screenshot capture dates keyed by dataset id, from
+// images/previews/manifest.json (written by tools/capture_previews.py).
+// Optional — without it cards simply show no "captured" caption.
+let PREVIEWS = {};
+
+async function loadPreviewManifest() {
+  try {
+    const response = await fetch(`images/previews/manifest.json?v=${new Date().getTime()}`);
+    if (!response.ok) return;
+    const data = await response.json();
+    if (data && data.previews && typeof data.previews === 'object') PREVIEWS = data.previews;
+  } catch (e) {
+    console.warn('Preview manifest not loaded (preview captions will be blank):', e);
+  }
+}
+
+// Path to a dataset's screenshot; the capture date doubles as a cache-buster
+// so a recaptured image shows up without a hard refresh.
+function previewImageSrc(ds) {
+  const meta = PREVIEWS[ds.id] || {};
+  const version = meta.captured ? `?v=${encodeURIComponent(meta.captured)}` : '';
+  return `images/previews/${encodeURIComponent(ds.id)}.webp${version}`;
+}
+
+// "2026-09-03" -> "Sep 2026" (parsed by hand so time zones can't shift the month)
+function formatCaptured(iso) {
+  const m = /^(\d{4})-(\d{2})/.exec(String(iso || ''));
+  if (!m) return '';
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const month = months[Number(m[2]) - 1];
+  return month ? `${month} ${m[1]}` : '';
+}
+
 // Helper function to split semicolon-separated strings
 function splitSemicolon(str) {
   if (!str || str === '') return [];
   return str.split(';').map(s => s.trim()).filter(s => s.length > 0);
+}
+
+// Escape a string for safe insertion into HTML (element content or quoted attributes)
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 // Load and process Excel file
@@ -16,6 +59,9 @@ async function loadExcelData() {
     // Add cache-busting parameter to force fresh load
     const cacheBuster = `?v=${new Date().getTime()}`;
     const response = await fetch(`datasets.xlsx${cacheBuster}`);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status} fetching datasets.xlsx`);
+    }
     const arrayBuffer = await response.arrayBuffer();
     const workbook = XLSX.read(arrayBuffer, { type: 'array' });
 
@@ -37,7 +83,9 @@ async function loadExcelData() {
       // Convert Markdown to HTML in additionalInfo
       let additionalInfo = row.additionalInfo || '';
       if (additionalInfo) {
-        additionalInfo = marked.parse(additionalInfo);
+        const parsedHtml = marked.parse(additionalInfo);
+        // Sanitize rendered markdown (defense-in-depth); degrade gracefully if CDN failed
+        additionalInfo = (typeof DOMPurify !== 'undefined') ? DOMPurify.sanitize(parsedHtml) : parsedHtml;
         // Remove newlines for consistency
         additionalInfo = additionalInfo.replace(/\n/g, '');
       }
@@ -65,9 +113,8 @@ async function loadExcelData() {
 
   } catch (error) {
     console.error('Error loading Excel file:', error);
-    const errorMsg = 'Unable to load datasets.xlsx. Please ensure the file is in the same directory as index.html.';
-    alert(errorMsg);
-    document.getElementById('resultCounter').innerHTML = '<i class="fas fa-exclamation-triangle"></i> Error loading Excel file';
+    document.getElementById('resultCounter').innerHTML = '<i class="fas fa-exclamation-triangle"></i> Error loading data';
+    document.getElementById('datasetGrid').innerHTML = '<p style="padding: 2rem; text-align: center;">Unable to load the data catalog right now. Please refresh the page to try again, or come back later.</p>';
     return [];
   }
 }
@@ -77,13 +124,11 @@ async function loadExcelData() {
 // =======================
 
 async function initializeApp() {
-  // Load data first
-  await loadExcelData();
+  // Load data first (the preview manifest is small and optional, so fetch it alongside)
+  await Promise.all([loadExcelData(), loadPreviewManifest()]);
 
-  // If no data loaded, stop here
+  // If no data loaded, stop here (loadExcelData has already rendered the error message)
   if (!DATASETS || DATASETS.length === 0) {
-    document.getElementById('resultCounter').innerHTML = '<i class="fas fa-exclamation-triangle"></i> No data loaded';
-    document.getElementById('datasetGrid').innerHTML = '<p style="padding: 2rem; text-align: center;">Unable to load datasets. Please check the browser console for errors.</p>';
     return;
   }
 
@@ -102,10 +147,14 @@ async function initializeApp() {
   const viewToggleCard = document.getElementById("viewToggleCard");
   const viewToggleList = document.getElementById("viewToggleList");
   const viewTogglePreview = document.getElementById("viewTogglePreview");
+  const viewToggleSky   = document.getElementById("viewToggleConstellation");
+  const skyRegion       = document.getElementById("skyRegion");
+  const skyStage        = document.getElementById("skyStage");
 
   // Info Modal elements
   const modal         = document.getElementById("infoModal");
   const modalTitle    = document.getElementById("modalTitle");
+  const modalPreview  = document.getElementById("modalPreview");
   const modalBody     = document.getElementById("modalBody");
   const modalDownload = document.getElementById("modalDownload");
   const modalClose    = document.getElementById("modalClose");
@@ -123,7 +172,13 @@ async function initializeApp() {
   let activeDateFrom  = null;
   let activeDateTo    = null;
   let selectedPills   = new Set();
-  let currentView     = localStorage.getItem('triosphere-view') || 'card';  // Load saved view preference
+  let currentView     = 'card';
+  try {
+    // localStorage can throw in private-browsing / blocked-storage modes
+    const savedView = localStorage.getItem('triosphere-view');
+    // Only accept known views
+    if (['card', 'list', 'preview', 'constellation'].includes(savedView)) currentView = savedView;
+  } catch (e) { /* fall back to card view */ }
 
   // --- DYNAMICALLY GENERATE TAG FILTERS ---
   const tagFiltersContainer = document.getElementById("tagFiltersContainer");
@@ -133,7 +188,7 @@ async function initializeApp() {
   });
   const sortedTags = [...allTags].sort((a, b) => a.localeCompare(b));
   tagFiltersContainer.innerHTML = sortedTags.map(tag => `
-    <div><label><input type="checkbox" class="filter-checkbox" data-filter-group="tags" value="${tag}"> ${tag}</label></div>
+    <div><label><input type="checkbox" class="filter-checkbox" data-filter-group="tags" value="${escapeHtml(tag)}"> ${escapeHtml(tag)}</label></div>
   `).join('');
 
   // --- DYNAMICALLY GENERATE REGION (region) FILTERS ---
@@ -146,7 +201,7 @@ async function initializeApp() {
   });
   const sortedregions = [...allregions].sort((a, b) => a.localeCompare(b));
   regionFiltersContainer.innerHTML = sortedregions.map(loc => `
-    <div><label><input type="checkbox" class="filter-checkbox" data-filter-group="region" value="${loc}"> ${loc}</label></div>
+    <div><label><input type="checkbox" class="filter-checkbox" data-filter-group="region" value="${escapeHtml(loc)}"> ${escapeHtml(loc)}</label></div>
   `).join('');
 
   const filters = document.querySelectorAll(".filter-checkbox");
@@ -181,18 +236,18 @@ async function initializeApp() {
     if (activeFilters.region.size) {
       if (!ds.region || !ds.region.some(loc => activeFilters.region.has(loc))) return false;
     }
-    const start = Number(ds.yearStart), end = Number(ds.yearEnd);
-    if (activeDateFrom !== null && end < activeDateFrom) return false;
-    if (activeDateTo   !== null && start > activeDateTo)   return false;
+    if (activeDateFrom !== null || activeDateTo !== null) {
+      // Entries with no year data stay visible when year filters are set
+      // (noted in the Year Range disclosure). A missing bound is treated as open-ended.
+      const hasYearData = ds.yearStart !== '' || ds.yearEnd !== '';
+      if (hasYearData) {
+        const start = ds.yearStart === '' ? -Infinity : Number(ds.yearStart);
+        const end   = ds.yearEnd   === '' ?  Infinity : Number(ds.yearEnd);
+        if (activeDateFrom !== null && end < activeDateFrom) return false;
+        if (activeDateTo   !== null && start > activeDateTo)   return false;
+      }
+    }
     return true;
-  }
-
-  // Helper function to generate PagePeeker thumbnail URL
-  function getPreviewUrl(url) {
-    // PagePeeker API - free service, no API key needed
-    // Size options: s (small), m (medium), l (large), x (extra large)
-    const encodedUrl = encodeURIComponent(url);
-    return `https://free.pagepeeker.com/v2/thumbs.php?size=l&url=${encodedUrl}`;
   }
 
   function buildCard(ds) {
@@ -213,43 +268,50 @@ async function initializeApp() {
       }
     }
 
-    // Build different layouts based on current view
     if (currentView === 'preview') {
-      const previewUrl = getPreviewUrl(ds.url);
+      // Preview view: a large screenshot of the source's website, with minimal text.
+      // For researchers who remember what a site looked like but not what it was called.
+      const captured = formatCaptured((PREVIEWS[ds.id] || {}).captured);
+      el.classList.add("card-preview");
       el.innerHTML = `
         ${recentlyAddedBadge}
-        <div class="card-preview-thumbnail">
-          <div class="preview-loading"><i class="fas fa-spinner fa-spin"></i></div>
-          <img src="${previewUrl}" alt="Preview of ${ds.name}"
-               onerror="this.style.display='none'; this.parentElement.querySelector('.preview-error').style.display='block';"
-               onload="this.parentElement.querySelector('.preview-loading').style.display='none';">
-          <div class="preview-error" style="display: none;">
-            <i class="fas fa-image" style="font-size: 2rem; opacity: 0.3; display: block; margin-bottom: 0.5rem;"></i>
-            Preview unavailable
-          </div>
-        </div>
-        <div class="card-content">
-          <h3>${ds.name}</h3>
-          <p>${ds.description}</p>
-          <button type="button" class="btn more-info">View Details</button>
+        <button type="button" class="preview-thumb more-info" aria-label="More info about ${escapeHtml(ds.name)}">
+          <img src="${escapeHtml(previewImageSrc(ds))}" alt="Screenshot of the ${escapeHtml(ds.name)} website"
+               width="800" height="500" loading="lazy" decoding="async">
+          ${captured ? `<span class="preview-captured" title="Screenshot captured ${escapeHtml(captured)}">${escapeHtml(captured)}</span>` : ''}
+        </button>
+        <div class="preview-body">
+          <h3>${escapeHtml(ds.name)}</h3>
+          <p>${escapeHtml(ds.description)}</p>
+          <button type="button" class="btn more-info">More Info</button>
         </div>
       `;
+      // No screenshot yet (or it failed to load): show a placeholder instead of a broken image
+      const img = el.querySelector("img");
+      img.addEventListener("error", () => {
+        const placeholder = document.createElement("span");
+        placeholder.className = "preview-missing";
+        placeholder.innerHTML = '<i class="fas fa-image" aria-hidden="true"></i>No preview yet';
+        img.replaceWith(placeholder);
+        const caption = el.querySelector(".preview-captured");
+        if (caption) caption.remove();
+      });
     } else {
-      // Regular card or list view
+      // Card or list view
       el.innerHTML = `
         ${recentlyAddedBadge}
-        <h3>${ds.name}</h3>
-        <p>${ds.description}</p>
+        <h3>${escapeHtml(ds.name)}</h3>
+        <p>${escapeHtml(ds.description)}</p>
         <div class="taglist">
-          ${ds.tags.map(t => `<span class="tag" data-tag="${t}">${t}</span>`).join("")}
+          ${ds.tags.map(t => `<span class="tag" data-tag="${escapeHtml(t)}">${escapeHtml(t)}</span>`).join("")}
         </div>
         <button type="button" class="btn more-info">More Info</button>
       `;
     }
 
-    // Add click handler for "More Info" button
-    el.querySelector(".more-info")
-      .addEventListener("click", () => showModal(ds));
+    // Add click handler for "More Info" (in preview view the screenshot is one too)
+    el.querySelectorAll(".more-info")
+      .forEach(btn => btn.addEventListener("click", () => showModal(ds)));
 
     // Add click handlers for tag pills to filter by that tag
     el.querySelectorAll(".tag").forEach(tagEl => {
@@ -258,9 +320,9 @@ async function initializeApp() {
         const tagValue = tagEl.dataset.tag;
 
         // Find the corresponding checkbox in the sidebar
-        const checkbox = document.querySelector(
-          `.filter-checkbox[data-filter-group="tags"][value="${tagValue}"]`
-        );
+        // (matched in JS rather than an attribute selector so quotes/brackets in a tag can't break it)
+        const checkbox = [...document.querySelectorAll('.filter-checkbox[data-filter-group="tags"]')]
+          .find(cb => cb.value === tagValue);
 
         if (checkbox) {
           // Toggle the checkbox
@@ -285,21 +347,82 @@ async function initializeApp() {
     return el;
   }
 
+  let lastFocusedEl = null;
+
   function showModal(ds) {
     modalTitle.textContent = ds.name;
     modalBody.innerHTML    = ds.additionalInfo;
+    if (modalPreview) {
+      // Reuse the preview screenshot as a banner; stays hidden until (unless) it loads
+      modalPreview.hidden = true;
+      modalPreview.onload  = () => { modalPreview.hidden = false; };
+      modalPreview.onerror = () => { modalPreview.hidden = true; };
+      modalPreview.alt = `Screenshot of the ${ds.name} website`;
+      modalPreview.src = previewImageSrc(ds);
+      // Already cached (e.g. reopening the same entry): load may not fire again
+      if (modalPreview.complete && modalPreview.naturalWidth > 0) modalPreview.hidden = false;
+    }
     modalDownload.onclick  = () => window.open(ds.url, "_blank");
+    lastFocusedEl = document.activeElement;
     modal.classList.remove("hidden");
+    modalClose.focus();
   }
 
   function hideModal() {
     modal.classList.add("hidden");
+    if (lastFocusedEl) lastFocusedEl.focus();
   }
 
   modalClose.addEventListener("click", hideModal);
   modal.addEventListener("click", e => {
     if (e.target === modal) hideModal();
   });
+
+  // Close whichever modal is open on Escape
+  document.addEventListener("keydown", e => {
+    if (e.key !== "Escape") return;
+    if (!modal.classList.contains("hidden")) hideModal();
+    if (suggestionModal && !suggestionModal.classList.contains("hidden")) hideSuggestionModal();
+  });
+
+  // Keep Tab focus inside an open modal (basic focus trap)
+  function trapFocus(modalEl) {
+    modalEl.addEventListener("keydown", e => {
+      if (e.key !== "Tab") return;
+      const focusables = [...modalEl.querySelectorAll(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      )].filter(el => el.offsetParent !== null);
+      if (!focusables.length) return;
+      const first = focusables[0], last = focusables[focusables.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    });
+  }
+  if (modal) trapFocus(modal);
+  if (suggestionModal) trapFocus(suggestionModal);
+
+  // --- CONSTELLATION VIEW ---
+  // A fourth reading of the same filtered subset. It borrows the catalog's
+  // search, filters and More Info modal rather than growing its own, so the
+  // star chart can never disagree with the cards about what matches.
+  let sky = null;
+  if (skyStage && window.TrioSphereConstellation) {
+    sky = window.TrioSphereConstellation.create({
+      canvas:     document.getElementById("skyCanvas"),
+      stage:      skyStage,
+      card:       document.getElementById("skyCard"),
+      legend:     document.getElementById("skyLegend"),
+      caption:    document.getElementById("skyCaption"),
+      list:       document.getElementById("skyList"),
+      previewSrc: previewImageSrc,
+      onOpen:     showModal
+    });
+    sky.setData(DATASETS);
+    const skyModeSel = document.getElementById("skyMode");
+    if (skyModeSel) skyModeSel.addEventListener("change", () => sky.setMode(skyModeSel.value));
+    const skyFitBtn = document.getElementById("skyFit");
+    if (skyFitBtn) skyFitBtn.addEventListener("click", () => sky.fit());
+  }
 
   function render() {
     const subset = DATASETS.filter(ds => passSearch(ds) && passFilters(ds));
@@ -309,15 +432,28 @@ async function initializeApp() {
     const plural = count === 1 ? 'dataset' : 'datasets';
     resultCounter.textContent = `${count} ${plural} found`;
 
+    // Store current filtered results for CSV export
+    window.currentFilteredResults = subset;
+
+    // The constellation keeps every star and dims the ones that don't match,
+    // so the shape of the whole catalog stays visible while filtering.
+    if (sky) sky.setMatches(new Set(subset.map(ds => ds.id)));
+    if (currentView === 'constellation') { grid.innerHTML = ""; return; }
+
     grid.innerHTML = "";
+    if (currentView === 'preview') {
+      const note = document.createElement("p");
+      note.className = "preview-note";
+      note.innerHTML = '<i class="fas fa-info-circle" aria-hidden="true"></i> '
+        + 'Screenshots are captured by hand and may not reflect a site’s current design. '
+        + 'Click one for details.';
+      grid.appendChild(note);
+    }
     if (!subset.length) {
-      grid.innerHTML = "<p>No datasets match your criteria.</p>";
+      grid.insertAdjacentHTML("beforeend", "<p>No datasets match your criteria.</p>");
     } else {
       subset.forEach(ds => grid.appendChild(buildCard(ds)));
     }
-
-    // Store current filtered results for CSV export
-    window.currentFilteredResults = subset;
   }
 
   // Wire up event listeners
@@ -374,11 +510,14 @@ async function initializeApp() {
 
   // --- NEW: SUGGESTION MODAL LOGIC ---
   function showSuggestionModal() {
+    lastFocusedEl = document.activeElement;
     suggestionModal.classList.remove("hidden");
+    suggestionText.focus();
   }
 
   function hideSuggestionModal() {
     suggestionModal.classList.add("hidden");
+    if (lastFocusedEl) lastFocusedEl.focus();
   }
 
   if (openSuggestionBtn) {
@@ -402,7 +541,10 @@ async function initializeApp() {
       e.preventDefault();
       const feedback = suggestionText.value.trim();
       if (feedback) {
-        alert("Thank you for your feedback!");
+        // Open the user's email app with the feedback pre-filled
+        const subject = encodeURIComponent("TrioSphere feedback");
+        const body = encodeURIComponent(feedback);
+        window.location.href = `mailto:jh.bertram@colostate.edu?subject=${subject}&body=${body}`;
         suggestionText.value = "";
         hideSuggestionModal();
       } else {
@@ -461,27 +603,36 @@ async function initializeApp() {
   // --- VIEW TOGGLE FUNCTIONALITY ---
   function setView(viewType) {
     currentView = viewType;
-    localStorage.setItem('triosphere-view', viewType);
+    try {
+      localStorage.setItem('triosphere-view', viewType);
+    } catch (e) { /* storage unavailable — view just won't persist */ }
 
     // Remove all view classes
     grid.classList.remove('list-view', 'preview-view');
 
     // Remove active state from all buttons
-    viewToggleCard.classList.remove('active');
-    viewToggleList.classList.remove('active');
+    const buttons = { card: viewToggleCard, list: viewToggleList,
+                      preview: viewTogglePreview, constellation: viewToggleSky };
+    Object.values(buttons).forEach(btn => {
+      if (!btn) return;
+      btn.classList.remove('active');
+      btn.setAttribute('aria-pressed', 'false');
+    });
 
-    viewToggleCard.setAttribute('aria-pressed', 'false');
-    viewToggleList.setAttribute('aria-pressed', 'false');
+    // Apply the selected view (card view is the default and needs no grid class)
+    if (viewType === 'list')    grid.classList.add('list-view');
+    if (viewType === 'preview') grid.classList.add('preview-view');
 
-    // Apply the selected view
-    if (viewType === 'list') {
-      grid.classList.add('list-view');
-      viewToggleList.classList.add('active');
-      viewToggleList.setAttribute('aria-pressed', 'true');
-    } else {
-      // Card view (default) - preview disabled
-      viewToggleCard.classList.add('active');
-      viewToggleCard.setAttribute('aria-pressed', 'true');
+    // The star chart replaces the card grid rather than sitting beside it.
+    // Unhide before activating: the canvas needs a real size to lay out.
+    const sky3 = (viewType === 'constellation');
+    grid.hidden = sky3;
+    if (skyRegion) skyRegion.hidden = !sky3;
+    if (sky) { if (sky3) sky.activate(); else sky.deactivate(); }
+    const activeBtn = buttons[viewType] || viewToggleCard;
+    if (activeBtn) {
+      activeBtn.classList.add('active');
+      activeBtn.setAttribute('aria-pressed', 'true');
     }
   }
 
@@ -502,19 +653,22 @@ async function initializeApp() {
     });
   }
 
-  // Preview view button disabled pending PageSeeker service coordination
-  // If re-enabling in future: uncomment preview button in HTML and add listener here
+  if (viewTogglePreview) {
+    viewTogglePreview.addEventListener('click', () => {
+      setView('preview');
+      render();  // Re-render for preview view
+    });
+  }
+
+  if (viewToggleSky) {
+    viewToggleSky.addEventListener('click', () => {
+      setView('constellation');
+      render();  // Re-render for constellation view
+    });
+  }
 
   // Initial draw
   render();
-
-  // --- HIGHLIGHT ACTIVE NAVIGATION LINK ---
-  document.querySelectorAll('.menu a').forEach(a => {
-    if (a.pathname.split('/').pop() === window.location.pathname.split('/').pop()) {
-      a.style.fontWeight = '700';
-      a.style.color = 'var(--csu-gold)';  // CSU gold for active page
-    }
-  });
 
   // --- STICKY PILLS ENHANCEMENT ---
   const pillsContainer = document.querySelector('.search-category-container');
@@ -559,6 +713,17 @@ async function initializeApp() {
 
   if (filterOverlay) {
     filterOverlay.addEventListener('click', closeFilterPanel);
+  }
+
+  // --- YEAR RANGE DISCLOSURE NOTE ---
+  const yearInfoBtn = document.getElementById('yearRangeInfoBtn');
+  const yearInfoNote = document.getElementById('yearRangeInfoNote');
+  if (yearInfoBtn && yearInfoNote) {
+    yearInfoBtn.addEventListener('click', () => {
+      const expanded = yearInfoBtn.getAttribute('aria-expanded') === 'true';
+      yearInfoBtn.setAttribute('aria-expanded', String(!expanded));
+      yearInfoNote.classList.toggle('hidden', expanded);
+    });
   }
 }
 
